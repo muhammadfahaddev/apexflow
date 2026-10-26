@@ -5,9 +5,9 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { TimelineItem } from "../../components/today/TimelineItem";
 import type { DailyPlanItem } from "@apexflow/types";
 
