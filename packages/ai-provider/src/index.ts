@@ -57,6 +57,7 @@ export interface AIProvider {
 // ── Provider Factory ─────────────────────────────────────────
 
 export type AIProviderType =
+  | "groq"
   | "gemini"
   | "openai"
   | "claude"
@@ -74,6 +75,10 @@ export async function createAIProvider(
   config: ProviderConfig
 ): Promise<AIProvider> {
   switch (config.provider) {
+    case "groq": {
+      const { GroqProvider } = await import("./providers/groq");
+      return new GroqProvider(config);
+    }
     case "gemini": {
       const { GeminiProvider } = await import("./providers/gemini");
       return new GeminiProvider(config);
