@@ -78,9 +78,19 @@ export function executeEmergencyReplan(request: RescheduleRequest): AdaptiveRepl
     }
   }
 
-  // 2. Prepare revised fixed anchors (Include emergency block as an anchor)
+  // 2. Prepare revised fixed anchors (Include past items and emergency block as anchors)
+  const pastAnchors: FixedCommitment[] = pastItems.map((p) => ({
+    id: p.id,
+    title: p.title,
+    start: new Date(p.startTime),
+    end: new Date(p.endTime),
+    flexibility: "fixed",
+    source: "manual",
+  }));
+
   const revisedAnchors: FixedCommitment[] = [
     ...fixedEvents,
+    ...pastAnchors,
     {
       id: `emergency-block-${Date.now()}`,
       title: `🚨 Emergency: ${emergency.reason || "Unavailable Period"}`,
@@ -91,10 +101,15 @@ export function executeEmergencyReplan(request: RescheduleRequest): AdaptiveRepl
     },
   ];
 
+  // Exclude tasks that were already completed/in the past from pending re-pack
+  const futurePendingTasks = allPendingTasks.filter((t) => {
+    return !pastItems.some((past) => past.id === t.id);
+  });
+
   // 3. Re-run deterministic scheduler for target date with updated anchors
   const schedulingResult = generateDailyPlan(
     currentPlan.date,
-    allPendingTasks,
+    futurePendingTasks,
     revisedAnchors,
     config
   );
