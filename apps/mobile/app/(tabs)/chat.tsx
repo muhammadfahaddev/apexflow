@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,118 +11,112 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-
-interface ChatMessage {
-  id: string;
-  sender: "user" | "agent";
-  text: string;
-  time: string;
-  toolExecuted?: string;
-}
+import { useMobileStore } from "../../lib/store/useMobileStore";
 
 export default function ChatScreen() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "1",
-      sender: "agent",
-      text: "Hello Fahad! Your mobile executive agent is active. What would you like to plan or execute right now?",
-      time: "Now",
-    },
-  ]);
+  const { messages, isThinking, sendChatMessage } = useMobileStore();
   const [inputText, setInputText] = useState("");
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  const handleSend = () => {
-    if (!inputText.trim()) return;
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [messages, isThinking]);
 
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      sender: "user",
-      text: inputText.trim(),
-      time: "Just now",
-    };
+  const handleSend = async (textToSend?: string) => {
+    const text = (textToSend || inputText).trim();
+    if (!text || isThinking) return;
 
-    setMessages((prev) => [...prev, userMsg]);
-    const currentInput = inputText;
     setInputText("");
-
-    setTimeout(() => {
-      let reply = "Your instruction has been acknowledged and context updated.";
-      let toolExecuted: string | undefined = undefined;
-
-      if (currentInput.toLowerCase().includes("emergency")) {
-        reply = "Emergency mode activated. I have rebuilt your schedule to accommodate this window.";
-        toolExecuted = "trigger_emergency";
-      } else if (currentInput.toLowerCase().includes("plan")) {
-        reply = "Here is your plan: 1 fixed meeting and 2 priority blocks are ready.";
-        toolExecuted = "plan_my_day";
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          sender: "agent",
-          text: reply,
-          toolExecuted,
-          time: "Just now",
-        },
-      ]);
-    }, 600);
+    await sendChatMessage(text);
   };
+
+  const quickPrompts = [
+    "Plan my day",
+    "Add task: Client proposal due 5 PM",
+    "I have a 2-hour emergency",
+  ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
-        style={styles.keyboardContainer}
+        style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* Messages List */}
-        <ScrollView contentContainerStyle={styles.messageList}>
-          {messages.map((m) => (
-            <View
-              key={m.id}
-              style={[
-                styles.bubbleWrapper,
-                m.sender === "user" ? styles.wrapperUser : styles.wrapperAgent,
-              ]}
-            >
+        {/* Messages Feed */}
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.messagesList}
+          showsVerticalScrollIndicator={false}
+        >
+          {messages.map((item) => {
+            const isUser = item.sender === "user";
+            return (
               <View
-                style={[
-                  styles.bubble,
-                  m.sender === "user" ? styles.bubbleUser : styles.bubbleAgent,
-                ]}
+                key={item.id}
+                style={[styles.messageRow, isUser ? styles.userRow : styles.agentRow]}
               >
-                <Text
+                <View
                   style={[
-                    styles.messageText,
-                    m.sender === "user" ? styles.textUser : styles.textAgent,
+                    styles.messageBubble,
+                    isUser ? styles.userBubble : styles.agentBubble,
                   ]}
                 >
-                  {m.text}
-                </Text>
+                  <Text style={[styles.messageText, isUser ? styles.userText : styles.agentText]}>
+                    {item.text}
+                  </Text>
 
-                {m.toolExecuted && (
-                  <View style={styles.toolBadge}>
-                    <Text style={styles.toolText}>⚡ Executed: {m.toolExecuted}</Text>
-                  </View>
-                )}
+                  {item.toolExecuted && (
+                    <View style={styles.toolTag}>
+                      <Text style={styles.toolTagText}>⚡ Executed: {item.toolExecuted}</Text>
+                    </View>
+                  )}
+
+                  <Text style={styles.timeText}>{item.time}</Text>
+                </View>
               </View>
-              <Text style={styles.timestamp}>{m.time}</Text>
+            );
+          })}
+
+          {isThinking && (
+            <View style={[styles.messageRow, styles.agentRow]}>
+              <View style={[styles.messageBubble, styles.agentBubble]}>
+                <Text style={styles.agentText}>⚡ ApexFlow is optimizing your schedule...</Text>
+              </View>
             </View>
-          ))}
+          )}
         </ScrollView>
 
+        {/* Quick Suggestion Chips */}
+        <View style={styles.suggestionsContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
+            {quickPrompts.map((prompt) => (
+              <TouchableOpacity
+                key={prompt}
+                style={styles.suggestionChip}
+                onPress={() => handleSend(prompt)}
+              >
+                <Text style={styles.suggestionText}>{prompt}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
         {/* Input Bar */}
-        <View style={styles.inputContainer}>
+        <View style={styles.inputBar}>
           <TextInput
             style={styles.textInput}
-            value={inputText}
-            onChangeText={setInputText}
             placeholder="Command your agent..."
             placeholderTextColor="#64748b"
+            value={inputText}
+            onChangeText={setInputText}
+            onSubmitEditing={() => handleSend()}
           />
-          <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-            <Ionicons name="arrow-up" size={20} color="#ffffff" />
+          <TouchableOpacity
+            style={[styles.sendButton, (!inputText.trim() || isThinking) && styles.sendButtonDisabled]}
+            onPress={() => handleSend()}
+            disabled={!inputText.trim() || isThinking}
+          >
+            <Ionicons name="arrow-up" size={18} color="#ffffff" />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -135,92 +129,121 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#090d16",
   },
-  keyboardContainer: {
+  container: {
     flex: 1,
   },
-  messageList: {
+  messagesList: {
     padding: 16,
     paddingBottom: 24,
+    gap: 12,
   },
-  bubbleWrapper: {
-    marginBottom: 14,
+  messageRow: {
+    flexDirection: "row",
+    marginBottom: 4,
   },
-  wrapperUser: {
-    alignItems: "flex-end",
+  userRow: {
+    justifyContent: "flex-end",
   },
-  wrapperAgent: {
-    alignItems: "flex-start",
+  agentRow: {
+    justifyContent: "flex-start",
   },
-  bubble: {
-    maxWidth: "82%",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+  messageBubble: {
+    maxWidth: "85%",
     borderRadius: 16,
+    padding: 12,
   },
-  bubbleUser: {
+  userBubble: {
     backgroundColor: "#6366f1",
-    borderBottomRightRadius: 2,
+    borderBottomRightRadius: 4,
   },
-  bubbleAgent: {
-    backgroundColor: "#1e293b",
-    borderBottomLeftRadius: 2,
+  agentBubble: {
+    backgroundColor: "#0f172a",
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#1e293b",
+    borderBottomLeftRadius: 4,
   },
   messageText: {
     fontSize: 14,
     lineHeight: 20,
   },
-  textUser: {
+  userText: {
     color: "#ffffff",
   },
-  textAgent: {
+  agentText: {
     color: "#f1f5f9",
   },
-  toolBadge: {
-    marginTop: 6,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.1)",
+  toolTag: {
+    marginTop: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    alignSelf: "flex-start",
   },
-  toolText: {
-    color: "#34d399",
-    fontSize: 11,
-    fontFamily: "monospace",
-  },
-  timestamp: {
-    color: "#64748b",
+  toolTagText: {
     fontSize: 10,
-    marginTop: 4,
-    paddingHorizontal: 4,
+    color: "#10b981",
+    fontFamily: "monospace",
+    fontWeight: "bold",
   },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+  timeText: {
+    fontSize: 10,
+    color: "#64748b",
+    alignSelf: "flex-end",
+    marginTop: 4,
+  },
+  suggestionsContainer: {
+    paddingVertical: 8,
+    backgroundColor: "#090d16",
     borderTopWidth: 1,
     borderTopColor: "#1e293b",
+  },
+  chipScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  suggestionChip: {
     backgroundColor: "#0f172a",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  suggestionText: {
+    color: "#cbd5e1",
+    fontSize: 11,
+  },
+  inputBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "#090d16",
+    borderTopWidth: 1,
+    borderTopColor: "#1e293b",
     gap: 10,
   },
   textInput: {
     flex: 1,
-    backgroundColor: "#090d16",
-    color: "#ffffff",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 14,
+    backgroundColor: "#0f172a",
     borderWidth: 1,
     borderColor: "#334155",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    color: "#f8fafc",
+    fontSize: 14,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#6366f1",
     alignItems: "center",
     justifyContent: "center",
+  },
+  sendButtonDisabled: {
+    opacity: 0.4,
   },
 });

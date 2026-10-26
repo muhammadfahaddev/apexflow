@@ -71,6 +71,7 @@ export class GroqProvider implements AIProvider {
         tools: formattedTools.length > 0 ? formattedTools : undefined,
         tool_choice: formattedTools.length > 0 ? "auto" : undefined,
         temperature: options?.temperature ?? 0.1,
+        max_tokens: options?.maxTokens ?? 500,
       }),
     });
 
@@ -81,7 +82,7 @@ export class GroqProvider implements AIProvider {
 
     const data = await response.json();
     const choice = data.choices?.[0]?.message;
-    const content = choice?.content || "";
+    const content = choice?.content || choice?.reasoning || "";
     const rawToolCalls = choice?.tool_calls || [];
 
     const toolCalls: ToolCall[] = rawToolCalls.map((tc: any) => ({
