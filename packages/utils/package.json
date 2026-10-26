@@ -7,8 +7,14 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "test": "vitest run"
+  },
   "dependencies": {
     "@apexflow/types": "workspace:*",
     "@apexflow/constants": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^2.0.0"
   }
 }
