@@ -1,0 +1,49 @@
+name: Integration Request
+description: Request a new third-party integration or offer to build one
+title: "[Integration]: "
+labels: ["integration", "help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Want to add a new integration to ApexFlow? 🔌
+        
+        ApexFlow has a plugin system — community integrations go in `integrations/community/`.
+        Read [adding-integration.md](../docs/contributing/adding-integration.md) to get started.
+
+  - type: input
+    id: service
+    attributes:
+      label: Service / Platform
+      placeholder: "e.g. Telegram, Slack, Notion, Outlook..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use Case
+      description: How would this integration be used with ApexFlow?
+      placeholder: "e.g. Send task reminders to Telegram when agent creates a reminder..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: hooks
+    attributes:
+      label: Which Plugin Hooks Are Needed?
+      description: Which ApexPlugin hooks would this integration use?
+      placeholder: |
+        - onTaskCreated
+        - onEmergencyMode
+        - onDayStarted
+        - Custom command...
+
+  - type: checkboxes
+    id: build
+    attributes:
+      label: Contribution
+      options:
+        - label: I want to build this integration
+        - label: I need someone else to build this
+        - label: I can help test it
